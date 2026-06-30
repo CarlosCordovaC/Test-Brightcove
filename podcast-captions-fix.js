@@ -21,36 +21,41 @@ videojs.registerPlugin('podcastCaptionsFix', function() {
     }
   }
 
-  // Manually update captions by reading active cues and rendering them
-  function updateCaptions() {
+  // Find the active showing track
+  function getActiveTrack() {
     var tracks = player.textTracks();
+    for (var i = 0; i < tracks.length; i++) {
+      if (tracks[i].mode === 'showing' && tracks[i].kind !== 'metadata') {
+        return tracks[i];
+      }
+    }
+    return null;
+  }
+
+  // Render active cues into the display
+  function renderCues() {
     var display = document.querySelector('.vjs-text-track-display');
     if (!display) return;
 
-    // Find the active showing track
-    var activeTrack = null;
-    for (var i = 0; i < tracks.length; i++) {
-      if (tracks[i].mode === 'showing' && tracks[i].kind !== 'metadata') {
-        activeTrack = tracks[i];
-        break;
-      }
-    }
-
-    if (!activeTrack) return;
-
     fixCaptionDisplay();
 
-    // Read active cues and inject them manually if display is empty
+    var activeTrack = getActiveTrack();
+    if (!activeTrack) return;
+
     var activeCues = activeTrack.activeCues;
+    var cueContainer = display.querySelector('div');
+    if (!cueContainer) return;
+
     if (activeCues && activeCues.length > 0) {
-      var cueContainer = display.querySelector('div');
-      if (cueContainer && cueContainer.innerHTML.trim() === '') {
-        var cueText = '';
-        for (var j = 0; j < activeCues.length; j++) {
-          cueText += '<div class="vjs-text-track-cue vjs-text-track-cue-en-US">' + activeCues[j].text + '</div>';
-        }
-        cueContainer.innerHTML = cueText;
+      var cueText = '';
+      for (var j = 0; j < activeCues.length; j++) {
+        cueText += '<div class="vjs-text-track-cue vjs-text-track-cue-en-US">' + activeCues[j].text + '</div>';
       }
+      // Always update — no condition blocking the update
+      cueContainer.innerHTML = cueText;
+    } else {
+      // Clear when no active cues
+      cueContainer.innerHTML = '<div style="position:absolute;inset:0px;margin:1.5%;"></div>';
     }
   }
 
@@ -67,12 +72,32 @@ videojs.registerPlugin('podcastCaptionsFix', function() {
       fixCaptionDisplay();
     });
 
-    // Update captions every 250ms to keep them in sync
-    var captionInterval = setInterval(function() {
-      updateCaptions();
-    }, 250);
+    // Listen to cuechange on active track for precise timing
+    tracks.on('addtrack', function(e) {
+      var track = e.track;
+      if (track.kind !== 'metadata') {
+        track.on('cuechange', function() {
+          renderCues();
+          fixCaptionDisplay();
+        });
+      }
+    });
 
-    // Clear interval when player is disposed
+    // Also attach cuechange to existing tracks
+    for (var i = 0; i < tracks.length; i++) {
+      if (tracks[i].kind !== 'metadata') {
+        tracks[i].on('cuechange', function() {
+          renderCues();
+          fixCaptionDisplay();
+        });
+      }
+    }
+
+    // Fallback interval at 100ms for any missed updates
+    var captionInterval = setInterval(function() {
+      renderCues();
+    }, 100);
+
     player.on('dispose', function() {
       clearInterval(captionInterval);
     });
