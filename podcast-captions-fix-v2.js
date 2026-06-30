@@ -18,7 +18,7 @@ videojs.registerPlugin('podcastCaptionsFix', function() {
     // Create our own overlay div
     var overlay = document.createElement('div');
     overlay.className = 'podcast-caption-overlay';
-    overlay.style.cssText = 'position:absolute;bottom:40px;left:5%;width:90%;text-align:center;font-size:16px;color:white;background:rgba(0,0,0,0.5);padding:4px 8px;border-radius:4px;z-index:9999;display:none;';
+    overlay.style.cssText = 'position:absolute;bottom:70px;left:5%;width:90%;text-align:center;font-size:16px;color:white;background:rgba(0,0,0,0.5);padding:4px 8px;border-radius:4px;z-index:9999;display:none;';
     player.el().appendChild(overlay);
 
     // Poll currentTime every 100ms and match cues manually
