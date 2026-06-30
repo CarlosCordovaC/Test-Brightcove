@@ -13,7 +13,7 @@ videojs.registerPlugin('podcastCaptionsFix', function() {
   ].join('\n');
   document.head.appendChild(style);
 
-  // Force caption display when a text track is set to showing
+  // Force caption display to stay visible
   function fixCaptionDisplay() {
     var display = player.getChild('textTrackDisplay');
     if (display) {
@@ -21,19 +21,60 @@ videojs.registerPlugin('podcastCaptionsFix', function() {
     }
   }
 
-  // Run fix on player ready
+  // Manually update captions by reading active cues and rendering them
+  function updateCaptions() {
+    var tracks = player.textTracks();
+    var display = document.querySelector('.vjs-text-track-display');
+    if (!display) return;
+
+    // Find the active showing track
+    var activeTrack = null;
+    for (var i = 0; i < tracks.length; i++) {
+      if (tracks[i].mode === 'showing' && tracks[i].kind !== 'metadata') {
+        activeTrack = tracks[i];
+        break;
+      }
+    }
+
+    if (!activeTrack) return;
+
+    fixCaptionDisplay();
+
+    // Read active cues and inject them manually if display is empty
+    var activeCues = activeTrack.activeCues;
+    if (activeCues && activeCues.length > 0) {
+      var cueContainer = display.querySelector('div');
+      if (cueContainer && cueContainer.innerHTML.trim() === '') {
+        var cueText = '';
+        for (var j = 0; j < activeCues.length; j++) {
+          cueText += '<div class="vjs-text-track-cue vjs-text-track-cue-en-US">' + activeCues[j].text + '</div>';
+        }
+        cueContainer.innerHTML = cueText;
+      }
+    }
+  }
+
   player.ready(function() {
     fixCaptionDisplay();
 
-    // Run fix whenever a text track changes mode
+    // Listen for track changes
     var tracks = player.textTracks();
     tracks.on('change', function() {
       fixCaptionDisplay();
     });
 
-    // Also listen on the tech level
     player.on('texttrackchange', function() {
       fixCaptionDisplay();
+    });
+
+    // Update captions every 250ms to keep them in sync
+    var captionInterval = setInterval(function() {
+      updateCaptions();
+    }, 250);
+
+    // Clear interval when player is disposed
+    player.on('dispose', function() {
+      clearInterval(captionInterval);
     });
   });
 });
